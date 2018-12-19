@@ -1,0 +1,12 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: packageserver
+  namespace: openshift-operator-lifecycle-manager
+spec:
+  channel: alpha
+  name: packageserver
+  source: olm-operators
+status:
+  currentCSV: packageserver.v0.8.0
+
