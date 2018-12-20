@@ -114,6 +114,9 @@
     - name: Delete existing kube-service-catalog Subscriptions
       shell: oc delete subscription --all -n kube-service-catalog
 
+    - name: Delete existing kube-service-catalog CSVs
+      shell: oc delete csv --all -n kube-service-catalog
+
     - name: Create kube-service-catalog Subscription
       shell: oc create -f {{ svcat_subscription }}
 
@@ -153,6 +156,9 @@
 
     - name: Delete existing automation-broker Subscriptions
       shell: oc delete subscription --all -n automation-broker
+
+    - name: Delete existing automation-broker CSVs
+      shell: oc delete csv --all -n automation-broker
 
     - name: Create automation-broker Subscription
       shell: oc create -f {{ asb_subscription }}
@@ -206,6 +212,9 @@
 
     - name: Delete existing template-broker Subscriptions
       shell: oc delete subscription --all -n openshift-template-service-broker
+
+    - name: Delete existing template-broker CSVs
+      shell: oc delete csv --all -n openshift-template-service-broker
 
     - name: Create template-broker Subscription
       shell: oc create -f {{ tsb_subscription }}
