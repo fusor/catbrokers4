@@ -4,6 +4,4 @@ metadata:
   name: service-catalog
   namespace: kube-service-catalog
 spec:
-  selector:
-    matchLabels:
-      ns: kube-service-catalog
+  selector: {}
