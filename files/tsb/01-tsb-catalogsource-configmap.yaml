@@ -19,6 +19,8 @@ data:
           singular: templateservicebroker
         scope: Namespaced
         version: v1alpha1
+        subresources:
+          status: {}
   clusterServiceVersions: |-
     - apiVersion: operators.coreos.com/v1alpha1
       kind: ClusterServiceVersion
