@@ -120,6 +120,7 @@ data:
                 - osb.openshift.io
                 resources:
                 - templateservicebrokers
+                - templateservicebrokers/status
                 verbs:
                 - "*"
               - apiGroups:
