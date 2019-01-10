@@ -1,7 +1,7 @@
 # catbrokers4
 Set up OLM managed Service Catalog, Ansible Broker and Template Broker on an existing OpenShift 4 cluster
 
-- Tested against libvirt cluster created by OpenShift 4 installer v0.8.0 https://github.com/openshift/installer/releases/tag/v0.8.0
+- Tested against libvirt cluster created by OpenShift 4 installer v0.9.1 https://github.com/openshift/installer/releases/tag/v0.9.1
 
 ## Usage
 1. Set up an OpenShift 4.0 cluster
