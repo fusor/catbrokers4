@@ -1,0 +1,73 @@
+- hosts: localhost
+  become: true
+  gather_facts: false
+
+  tasks:
+  - debug:
+      msg: "##### [INFO] - If any of these diagnostic commands fail, check out https://github.com/openshift/installer/blob/master/docs/dev/libvirt-howto.md"
+
+  - pause:
+      seconds: 3
+
+  - name: Fail if /dev/kvm doesn't exist
+    shell: ls -l /dev/kvm
+
+  - name: Check for required libvirt and qemu packages
+    shell: warn=False rpm -q {{ item }}
+    with_items:
+      - libvirt
+      - libvirt-devel
+      - libvirt-daemon-kvm
+      - qemu-kvm
+
+  - name: Fail if libvirtd isn't enabled
+    shell: systemctl is-enabled libvirtd
+
+  - name: Check if /etc/polkit-1/rules.d/80-libvirt.rules exists (recommended for qemu permissions)
+    shell: ls -l /etc/polkit-1/rules.d/80-libvirt.rules
+    register: result
+    failed_when: result.rc not in [0,1,2]
+
+  - debug:
+      msg: "##### [NON-FATAL WARNING] - libvirt polkit extension not found at expected location. See https://github.com/openshift/installer/blob/master/docs/dev/libvirt-howto.md#make-sure-you-have-permissions-for-qemusystem"
+    when: result.rc != 0
+
+  - name: Check ipv4 forwarding status
+    shell: sysctl net.ipv4.ip_forward
+    register: result
+
+  - name: Fail if ipv4 forwarding disabled
+    fail:
+      msg: IPv4 forwarding needs to be enabled to create a libvirt cluster
+    when: result.rc != 0
+
+
+  - name: Fail on misconfiguration of /etc/libvirt/libvirtd.conf
+    shell: "grep \"{{ item }}\" /etc/libvirt/libvirtd.conf"
+    with_items:
+      - '^listen_tls.*=.*0'
+      - '^listen_tcp.*=.*1'
+      - '^auth_tcp.*=.*"none"'
+      - '^tcp_port.*=.*"16509"'
+
+  - name: Fail if /etc/sysconfig/libvirtd LIBVIRTD_ARGS isn't set to --listen
+    shell: "grep 'LIBVIRTD_ARGS=\"--listen\"' /etc/sysconfig/libvirtd"
+
+
+  - name: Fail if virbr0 interface inet address NOT 192.168.122.1
+    shell: ifconfig virbr0 | grep inet | grep -o 192.168.122.1
+
+  - name: Fail if libvirt default network ip address NOT 192.168.122.1
+    shell: 'virsh net-dumpxml default | grep "ip address" | grep -o 192.168.122.1'
+
+  - name: Fail if libvirt default storage pool not running
+    shell: virsh pool-info default | grep State | grep running
+
+  - name: Fail if libvirt default storage pool not set to autostart
+    shell: virsh pool-info default | grep Autostart | grep yes
+
+  - name: Fail if dns=dnsmasq not set in /etc/NetworkManager/NetworkManager.conf
+    shell: grep ^dns.*=.*dnsmasq /etc/NetworkManager/NetworkManager.conf
+
+  - name: Fail if NetworkManager not actively using dnsmasq and needs reload
+    shell: systemctl status NetworkManager | grep dnsmasq
