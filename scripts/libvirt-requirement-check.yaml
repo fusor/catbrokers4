@@ -1,9 +1,6 @@
 - hosts: localhost
-  #strategy: debug
   become: true
   gather_facts: false
-  vars:
-    package_server_subscription: "{{ playbook_dir }}/files/packageserver-subscription.yaml"
 
   tasks:
   - debug:
