@@ -148,7 +148,7 @@ data:
                 - deploymentconfigs
                 verbs:
                 - "*"
-            - serviceAccountName: automation-broker
+            - serviceAccountName: ansible-service-broker
               rules:
               - apiGroups:
                 - ""
@@ -231,7 +231,7 @@ data:
               #  - get
               #  - patch
               #  - update
-            - serviceAccountName: automation-broker
+            - serviceAccountName: ansible-service-broker
               rules:
               - apiGroups:
                 - ""
@@ -313,7 +313,7 @@ data:
                 - netnamespaces
                 verbs:
                 - update
-            - serviceAccountName: automation-broker-client
+            - serviceAccountName: ansible-service-broker-client
               rules:
               - nonResourceURLs:
                 - "/osb"
