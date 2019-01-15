@@ -64,7 +64,7 @@ data:
         name: automationbrokeroperator.v0.1.0
         namespace: placeholder
         annotations:
-          alm-examples: '[{"apiVersion":"automationbroker.io/v1alpha1","kind":"AutomationBroker","metadata":{"name":"automation-broker","namespace":"automation-broker"},"spec":{"createBrokerNamespace":"false","waitForBroker":"false"}}]'
+          alm-examples: '[{"apiVersion":"automationbroker.io/v1alpha1","kind":"AutomationBroker","metadata":{"name":"ansible-service-broker","namespace":"openshift-ansible-service-broker"},"spec":{"createBrokerNamespace":"false","waitForBroker":"false"}}]'
       spec:
         displayName: Automation Broker Operator
         description: |
@@ -148,7 +148,7 @@ data:
                 - deploymentconfigs
                 verbs:
                 - "*"
-            - serviceAccountName: automation-broker
+            - serviceAccountName: ansible-service-broker
               rules:
               - apiGroups:
                 - ""
@@ -231,7 +231,7 @@ data:
               #  - get
               #  - patch
               #  - update
-            - serviceAccountName: automation-broker
+            - serviceAccountName: ansible-service-broker
               rules:
               - apiGroups:
                 - ""
@@ -313,7 +313,7 @@ data:
                 - netnamespaces
                 verbs:
                 - update
-            - serviceAccountName: automation-broker-client
+            - serviceAccountName: ansible-service-broker-client
               rules:
               - nonResourceURLs:
                 - "/osb"
