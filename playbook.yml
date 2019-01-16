@@ -30,31 +30,6 @@
     register: pkgman_result
     failed_when: pkgman_result.rc not in [0,1]
 
-  - name: Handle OLM packageserver not coming up properly
-    when: pkgman_result.rc == 1
-    block:
-    - name: Delete packageserver subscription if PackageManifests aren't visible
-      shell: oc delete subscription --all -n openshift-operator-lifecycle-manager
-
-    - name: Delete packageserver CSV if PackageManifests aren't visible
-      shell: oc delete csv --all -n openshift-operator-lifecycle-manager
-
-    - name: Create packageserver subscription if PackageManifests aren't visible
-      shell: oc create -f {{ package_server_subscription }}
-
-    - name: Wait for packageserver pod to start running
-      action: shell oc get pods | grep packageserver | grep Running
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 20
-
-    - name: Wait for PackageManifests resource to reappear once packageserver comes back
-      action: shell oc get packagemanifests
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 20
-      failed_when: cmd_result.rc not in [0,1]
-
   - name: Remove limits from rh-operators ConfigMap/CatalogSource
     block:
     - name: Scale down CVO so that limit removal will persist
