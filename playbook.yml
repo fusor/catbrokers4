@@ -155,10 +155,10 @@
       failed_when: cmd_result.rc not in [0,1]
 
     - name: Delete existing automation-broker Subscriptions
-      shell: oc delete subscription --all -n automation-broker
+      shell: oc delete subscription --all -n openshift-ansible-service-broker
 
     - name: Delete existing automation-broker CSVs
-      shell: oc delete csv --all -n automation-broker
+      shell: oc delete csv --all -n openshift-ansible-service-broker
 
     - name: Create automation-broker Subscription
       shell: oc create -f {{ asb_subscription }}
@@ -174,18 +174,16 @@
       shell: oc apply -f {{ asb_cr }}
 
     - name: Wait for automation-broker-operator pod to start
-      action: shell oc get pods -n automation-broker | grep automation-broker-operator | grep Running
+      action: shell oc get pods -n openshift-ansible-service-broker | grep automation-broker-operator | grep Running
       register: cmd_result
       until: cmd_result.rc == 0
       retries: 30
-      failed_when: cmd_result.rc not in [0,1]
 
     - name: Wait for automation-broker pod to start
-      action: shell oc get pods -n automation-broker | grep automation-broker-1 | grep Running
+      action: shell oc get pods -n openshift-ansible-service-broker | grep asb-1 | grep Running
       register: cmd_result
       until: cmd_result.rc == 0
       retries: 20
-      failed_when: cmd_result.rc not in [0,1]
 
     - name: Create automation-broker clusterrolebinding
       shell: oc apply -f {{ asb_clusterrolebinding }}
