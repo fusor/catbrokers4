@@ -29,6 +29,19 @@
       retries: 20
       failed_when: cmd_result.rc not in [0,1]
 
+    # TODO: Remove this when marketplace supports grpc catalogsource
+    - name: Create svcat rbac
+      vars:
+        action: "{{ 'apply' if state == 'present' else 'delete' }}"
+      block:
+        # TODO: Uncomment when svcat master is fixed
+        # - name: Get aggregated roles
+        #   get_url:
+        #     url: https://raw.githubusercontent.com/openshift/service-catalog/master/manifests/02-aggregated-roles.yaml
+        #     dest: "{{ playbook_dir }}/files/svcat-aggregated-roles.yaml"
+        - name: Use kubectl
+          action: "shell sed 's|kube-service-catalog|openshift-operators|g' {{ playbook_dir }}/files/svcat-aggregated-roles.yaml | kubectl {{ action }} -f -"
+
     # TODO: Remove this when move to install from marketplace
     - name: osb-operators catalog source state={{ state }}
       vars:
