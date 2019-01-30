@@ -20,6 +20,7 @@
         - subscription.yaml.j2
       loop_control:
         pause: 2
+      tags: svcat
 
     - name: Wait for kube-service-catalog
       when: state == 'present'
@@ -28,6 +29,7 @@
       until: cmd_result.rc == 0
       retries: 20
       failed_when: cmd_result.rc not in [0,1]
+      tags: svcat
 
     # TODO: Remove this when marketplace supports grpc catalogsource
     - name: Create svcat rbac
@@ -41,6 +43,7 @@
         #     dest: "{{ playbook_dir }}/files/svcat-aggregated-roles.yaml"
         - name: Use kubectl
           action: "shell sed 's|kube-service-catalog|openshift-operators|g' {{ playbook_dir }}/files/svcat-aggregated-roles.yaml | kubectl {{ action }} -f -"
+      tags: svcat
 
     # TODO: Remove this when move to install from marketplace
     - name: osb-operators catalog source state={{ state }}
@@ -50,7 +53,6 @@
       k8s:
         state: "{{ state }}"
         definition: "{{ lookup('template', 'catalogsource.yaml.j2') | from_yaml }}"
-
 
     # TODO: Replace this with an install from marketplace
     - name: ansible-service-broker state={{ state }}
@@ -71,6 +73,7 @@
         - subscription.yaml.j2
       loop_control:
         pause: 2
+      tags: asb
 
     - name: Wait for automationbroker
       when: state == 'present'
@@ -79,6 +82,7 @@
       until: cmd_result.rc == 0
       retries: 20
       failed_when: cmd_result.rc not in [0,1]
+      tags: asb
 
     - name: ansible-service-broker CR state={{ state }}
       vars:
@@ -88,6 +92,7 @@
       k8s:
         state: "{{ state }}"
         definition: "{{ lookup('template', 'customresource.yaml.j2')}}"
+      tags: asb
 
     # TODO: Replace this with an install from marketplace
     - name: template-service-broker state={{ state }}
@@ -108,6 +113,7 @@
         - subscription.yaml.j2
       loop_control:
         pause: 2
+      tags: tsb
 
     - name: Wait for templateservicebroker
       when: state == 'present'
@@ -116,6 +122,7 @@
       until: cmd_result.rc == 0
       retries: 20
       failed_when: cmd_result.rc not in [0,1]
+      tags: tsb
 
     - name: template-service-broker CR state={{ state }}
       vars:
@@ -125,3 +132,4 @@
       k8s:
         state: "{{ state }}"
         definition: "{{ lookup('template', 'customresource.yaml.j2')}}"
+      tags: tsb
