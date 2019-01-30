@@ -80,7 +80,8 @@
       action: shell oc get crds | grep 'automationbrokers.osb.openshift.io'
       register: cmd_result
       until: cmd_result.rc == 0
-      retries: 20
+      retries: 10
+      delay: 60
       failed_when: cmd_result.rc not in [0,1]
       tags: asb
 
@@ -120,7 +121,8 @@
       action: shell oc get crds | grep 'templateservicebrokers.osb.openshift.io'
       register: cmd_result
       until: cmd_result.rc == 0
-      retries: 20
+      retries: 30
+      delay: 10
       failed_when: cmd_result.rc not in [0,1]
       tags: tsb
 
