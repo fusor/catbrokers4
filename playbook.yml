@@ -1,218 +1,137 @@
 - hosts: localhost
   vars:
-    package_server_subscription: "{{ playbook_dir }}/files/packageserver-subscription.yaml"
-
-    svcat_subscription: "{{ playbook_dir }}/files/svcat/svcat-subscription.yaml"
-    svcat_operatorgroup: "{{ playbook_dir }}/files/svcat/svcat-operatorgroup.yaml"
-    svcat_namespace: "{{ playbook_dir }}/files/svcat/svcat-namespace.yaml"
-    svcat_rh_operators_catalogsource_configmap: "{{ playbook_dir }}/files/svcat/0000_30_06-rh-operators.configmap.yaml"
-    svcat_rh_operators_configmap: "{{ playbook_dir }}/files/svcat/0000_30_09-rh-operators.catalogsource.yaml"
-
-    asb_namespace: "{{ playbook_dir }}/files/asb/00-asb-namespace.yaml"
-    asb_catalogsource_configmap: "{{ playbook_dir }}/files/asb/01-asb-catalogsource-configmap.yaml"
-    asb_catalogsource: "{{ playbook_dir }}/files/asb/02-asb-catalogsource.yaml"
-    asb_operatorgroup: "{{ playbook_dir }}/files/asb/03-asb-operatorgroup.yaml"
-    asb_subscription: "{{ playbook_dir }}/files/asb/04-asb-subscription.yaml"
-    asb_cr: "{{ playbook_dir }}/files/asb/05-asb-cr.yaml"
-    asb_clusterrolebinding: "{{ playbook_dir }}/files/asb/06-asb-clusterrolebinding.yaml"
-
-
-    tsb_namespace: "{{ playbook_dir }}/files/tsb/00-tsb-namespace.yaml"
-    tsb_catalogsource_configmap: "{{ playbook_dir }}/files/tsb/01-tsb-catalogsource-configmap.yaml"
-    tsb_catalogsource: "{{ playbook_dir }}/files/tsb/02-tsb-catalogsource.yaml"
-    tsb_operatorgroup: "{{ playbook_dir }}/files/tsb/03-tsb-operatorgroup.yaml"
-    tsb_subscription: "{{ playbook_dir }}/files/tsb/04-tsb-subscription.yaml"
-    tsb_cr: "{{ playbook_dir }}/files/tsb/05-tsb-cr.yaml"
-
+    state: present
+    osb_operators_image: docker.io/automationbroker/osb-operators
   tasks:
-  - name: Check if PackageManifests resource type can be retrieved
-    shell: oc get packagemanifests
-    register: pkgman_result
-    failed_when: pkgman_result.rc not in [0,1]
+    - name: service-catalog via marketplace state={{ state }}
+      vars:
+        name: svcat
+        namespace: openshift-operators
+        source: svcat
+        source_namespace: openshift-operators
+        package_name: svcat
+        starting_csv: svcat.v0.1.34
+        channel: alpha
+      k8s:
+        state: "{{ state }}"
+        definition: "{{ lookup('template', item) | from_yaml }}"
+      loop:
+        - catalogsourceconfig.yaml.j2
+        - subscription.yaml.j2
+      loop_control:
+        pause: 2
+      tags: svcat
 
-  - name: Remove limits from rh-operators ConfigMap/CatalogSource
-    block:
-    - name: Scale down CVO so that limit removal will persist
-      shell: oc -n openshift-cluster-version scale --replicas=0 deploy/cluster-version-operator
-
-    - name: Delete rh-operators ConfigMap
-      shell: oc delete configmap rh-operators -n openshift-operator-lifecycle-manager || true
-
-    - name: Delete rh-operators CatalogSource
-      shell: oc delete catalogsource rh-operators -n openshift-operator-lifecycle-manager || true
-
-    - name: Delete all pods in openshift-operator-lifecycle-manager namespace
-      shell: oc delete pods --all -n openshift-operator-lifecycle-manager
-
-    - name: Wait for PackageManifests resource to reappear once packageserver comes back
-      action: shell oc get packagemanifests
+    - name: Wait for kube-service-catalog
+      when: state == 'present'
+      action: shell oc api-versions | grep 'servicecatalog.k8s.io'
       register: cmd_result
       until: cmd_result.rc == 0
       retries: 20
       failed_when: cmd_result.rc not in [0,1]
+      tags: svcat
 
-    - name: Wait for svcat PackageManifest to disappear
-      action: shell oc get packagemanifests | grep svcat
-      register: cmd_result
-      until: cmd_result.rc == 1
-      retries: 20
-      failed_when: cmd_result.rc not in [0,1]
+    # TODO: Remove this when marketplace supports grpc catalogsource
+    - name: Create svcat rbac
+      vars:
+        action: "{{ 'apply' if state == 'present' else 'delete' }}"
+      block:
+        # TODO: Uncomment when svcat master is fixed
+        # - name: Get aggregated roles
+        #   get_url:
+        #     url: https://raw.githubusercontent.com/openshift/service-catalog/master/manifests/02-aggregated-roles.yaml
+        #     dest: "{{ playbook_dir }}/files/svcat-aggregated-roles.yaml"
+        - name: Use kubectl
+          action: "shell sed 's|kube-service-catalog|openshift-operators|g' {{ playbook_dir }}/files/svcat-aggregated-roles.yaml | kubectl {{ action }} -f -"
+      tags: svcat
 
-    - name: Create rh-operators ConfigMap
-      shell: oc create -f {{ svcat_rh_operators_configmap }}
+    # TODO: Remove this when move to install from marketplace
+    - name: osb-operators catalog source state={{ state }}
+      vars:
+        name: osb-operators
+        image: "{{ osb_operators_image }}"
+      k8s:
+        state: "{{ state }}"
+        definition: "{{ lookup('template', 'catalogsource.yaml.j2') | from_yaml }}"
 
-    - name: Create rh-operators CatalogSource
-      shell: oc create -f {{ svcat_rh_operators_catalogsource_configmap }}
+    # TODO: Replace this with an install from marketplace
+    - name: ansible-service-broker state={{ state }}
+      vars:
+        name: ansible-service-broker
+        namespace: openshift-ansible-service-broker
+        source: osb-operators
+        source_namespace: openshift-operator-lifecycle-manager
+        package_name: automationbroker
+        starting_csv: automationbrokeroperator.v0.2.0
+        channel: alpha
+      k8s:
+        state: "{{ state }}"
+        definition: "{{ lookup('template', item) | from_yaml }}"
+      loop:
+        - namespace.yaml.j2
+        - operatorgroup.yaml.j2
+        - subscription.yaml.j2
+      loop_control:
+        pause: 2
+      tags: asb
 
-    - name: Get catalog-operator pod name
-      shell: oc get pods -n openshift-operator-lifecycle-manager | grep catalog | grep Running | awk '{print $1}'
-      register: cmd_result
-
-    - name: Delete catalog-operator pod
-      shell: oc delete pod {{ cmd_result.stdout }} -n openshift-operator-lifecycle-manager
-
-    - name: Wait for svcat PackageManifest to appear
-      action: shell oc get packagemanifests | grep svcat
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 20
-      failed_when: cmd_result.rc not in [0,1]
-
-  - name: Create Service Catalog on cluster
-    block:
-    - name: Create kube-service-catalog namespace
-      shell: oc apply -f {{ svcat_namespace }}
-
-    - name: Create kube-service-catalog OperatorGroup
-      shell: oc apply -f {{ svcat_operatorgroup }}
-
-    - name: Delete existing kube-service-catalog Subscriptions
-      shell: oc delete subscription --all -n kube-service-catalog
-
-    - name: Delete existing kube-service-catalog CSVs
-      shell: oc delete csv --all -n kube-service-catalog
-
-    - name: Create kube-service-catalog Subscription
-      shell: oc create -f {{ svcat_subscription }}
-
-    - name: Wait for kube-service-catalog apiserver to become ready
-      action: shell oc get pods -n kube-service-catalog | grep apiserver | grep Running
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 20
-      failed_when: cmd_result.rc not in [0,1]
-
-    - name: Wait for kube-service-catalog controller-manager to become ready
-      action: shell oc get pods -n kube-service-catalog | grep controller-manager | grep Running
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 20
-      failed_when: cmd_result.rc not in [0,1]
-
-  - name: Create Automation Broker on cluster
-    block:
-    - name: Create automation-broker namespace
-      shell: oc apply -f {{ asb_namespace }}
-
-    - name: Create automation-broker ConfigMap
-      shell: oc apply -f {{ asb_catalogsource_configmap }}
-
-    - name: Create automation-broker CatalogSource
-      shell: oc apply -f {{ asb_catalogsource }}
-
-    - name: Create automation-broker OperatorGroup
-      shell: oc apply -f {{ asb_operatorgroup }}
-
-    - name: Wait for automationbroker PackageManifest to appear
-      action: shell oc get packagemanifests | grep automationbroker
-      register: cmd_result
-      until: cmd_result.rc == 0
-      failed_when: cmd_result.rc not in [0,1]
-
-    - name: Delete existing automation-broker Subscriptions
-      shell: oc delete subscription --all -n openshift-ansible-service-broker
-
-    - name: Delete existing automation-broker CSVs
-      shell: oc delete csv --all -n openshift-ansible-service-broker
-
-    - name: Create automation-broker Subscription
-      shell: oc create -f {{ asb_subscription }}
-
-    - name: Wait for automationbroker resource type to exist
-      action: shell oc get crd | grep automationbrokers
+    - name: Wait for automationbroker
+      when: state == 'present'
+      action: shell oc get crds | grep 'automationbrokers.osb.openshift.io'
       register: cmd_result
       until: cmd_result.rc == 0
       retries: 10
+      delay: 60
       failed_when: cmd_result.rc not in [0,1]
+      tags: asb
 
-    - name: Create automationbroker CR to create instance of broker
-      shell: oc apply -f {{ asb_cr }}
+    - name: ansible-service-broker CR state={{ state }}
+      vars:
+        kind: AutomationBroker
+        name: ansible-service-broker
+        namespace: openshift-ansible-service-broker
+      k8s:
+        state: "{{ state }}"
+        definition: "{{ lookup('template', 'customresource.yaml.j2')}}"
+      tags: asb
 
-    - name: Wait for automation-broker-operator pod to start
-      action: shell oc get pods -n openshift-ansible-service-broker | grep automation-broker-operator | grep Running
+    # TODO: Replace this with an install from marketplace
+    - name: template-service-broker state={{ state }}
+      vars:
+        name: template-service-broker
+        namespace: openshift-template-service-broker
+        source: osb-operators
+        source_namespace: openshift-operator-lifecycle-manager
+        package_name: templateservicebroker
+        starting_csv: templateservicebrokeroperator.v0.2.0
+        channel: alpha
+      k8s:
+        state: "{{ state }}"
+        definition: "{{ lookup('template', item) | from_yaml }}"
+      loop:
+        - namespace.yaml.j2
+        - operatorgroup.yaml.j2
+        - subscription.yaml.j2
+      loop_control:
+        pause: 2
+      tags: tsb
+
+    - name: Wait for templateservicebroker
+      when: state == 'present'
+      action: shell oc get crds | grep 'templateservicebrokers.osb.openshift.io'
       register: cmd_result
       until: cmd_result.rc == 0
       retries: 30
-
-    - name: Wait for automation-broker pod to start
-      action: shell oc get pods -n openshift-ansible-service-broker | grep asb-1 | grep Running
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 20
-
-    - name: Create automation-broker clusterrolebinding
-      shell: oc apply -f {{ asb_clusterrolebinding }}
-
-  - name: Create Template Broker on cluster
-    block:
-    - name: Create openshift-template-service-broker namespace
-      shell: oc apply -f {{ tsb_namespace }}
-
-    - name: Create template-broker ConfigMap
-      shell: oc apply -f {{ tsb_catalogsource_configmap }}
-
-    - name: Create template-broker CatalogSource
-      shell: oc apply -f {{ tsb_catalogsource }}
-
-    - name: Create template-broker OperatorGroup
-      shell: oc apply -f {{ tsb_operatorgroup }}
-
-    - name: Wait for templateservicebroker PackageManifest to appear
-      action: shell oc get packagemanifests | grep templateservicebroker
-      register: cmd_result
-      until: cmd_result.rc == 0
+      delay: 10
       failed_when: cmd_result.rc not in [0,1]
+      tags: tsb
 
-    - name: Delete existing template-broker Subscriptions
-      shell: oc delete subscription --all -n openshift-template-service-broker
-
-    - name: Delete existing template-broker CSVs
-      shell: oc delete csv --all -n openshift-template-service-broker
-
-    - name: Create template-broker Subscription
-      shell: oc create -f {{ tsb_subscription }}
-
-    - name: Wait for templateservicebrokers resource type to exist
-      action: shell oc get crd | grep templateservicebrokers
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 10
-      failed_when: cmd_result.rc not in [0,1]
-
-    - name: Create templateservicebroker CR to create instance of broker
-      shell: oc apply -f {{ tsb_cr }}
-
-    - name: Wait for template-service-broker-operator pod to start
-      action: shell oc get pods -n openshift-template-service-broker | grep template-service-broker-operator | grep Running
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 30
-      failed_when: cmd_result.rc not in [0,1]
-
-    - name: Wait for tsb apiserver-1 pod to start
-      action: shell oc get pods -n openshift-template-service-broker | grep apiserver-1 | grep Running
-      register: cmd_result
-      until: cmd_result.rc == 0
-      retries: 20
-      failed_when: cmd_result.rc not in [0,1]
-
+    - name: template-service-broker CR state={{ state }}
+      vars:
+        kind: TemplateServiceBroker
+        name: template-service-broker
+        namespace: openshift-template-service-broker
+      k8s:
+        state: "{{ state }}"
+        definition: "{{ lookup('template', 'customresource.yaml.j2')}}"
+      tags: tsb

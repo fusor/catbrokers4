@@ -1,9 +1,0 @@
-apiVersion: operators.coreos.com/v1alpha2
-kind: OperatorGroup
-metadata:
-  name: ansible-service-broker
-  namespace: openshift-ansible-service-broker
-spec:
-  selector:
-    matchLabels:
-      ns: openshift-ansible-service-broker
