@@ -75,6 +75,21 @@
         pause: 2
       tags: asb
 
+    # HACK: Create a ClusterRoleBinding that grants the ASB admin so that it can,
+    # in turn, grant APB SAs either admin or edit privileges. This was expected
+    # to be supported with OLM, but the current plan is for Marketplace to
+    # ship with this specific rule. Until that is implemented and available
+    # in marketplace, we need to add the workaround here.
+    # TODO: Rip this out once marketplace has support for granting the broker admin.
+    - name: Grant ansible-service-broker the admin clusterrole
+      vars:
+        broker_name: ansible-service-broker
+        broker_namespace: openshift-ansible-service-broker
+      k8s:
+        state: "{{ state }}"
+        definition: "{{ lookup('template', 'broker-admin.clusterrolebinding.yaml.j2') | from_yaml }}"
+      tags: asb
+
     - name: Wait for automationbroker
       when: state == 'present'
       action: shell oc get crds | grep 'automationbrokers.osb.openshift.io'
