@@ -27,8 +27,8 @@
       action: shell oc api-versions | grep 'servicecatalog.k8s.io'
       register: cmd_result
       until: cmd_result.rc == 0
-      retries: 20
-      failed_when: cmd_result.rc not in [0,1]
+      retries: 10
+      delay: 60
       tags: svcat
 
     # TODO: Remove this when marketplace supports grpc catalogsource
@@ -97,7 +97,6 @@
       until: cmd_result.rc == 0
       retries: 10
       delay: 60
-      failed_when: cmd_result.rc not in [0,1]
       tags: asb
 
     - name: ansible-service-broker CR state={{ state }}
@@ -136,9 +135,8 @@
       action: shell oc get crds | grep 'templateservicebrokers.osb.openshift.io'
       register: cmd_result
       until: cmd_result.rc == 0
-      retries: 30
-      delay: 10
-      failed_when: cmd_result.rc not in [0,1]
+      retries: 10
+      delay: 60
       tags: tsb
 
     - name: template-service-broker CR state={{ state }}
