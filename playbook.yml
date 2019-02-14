@@ -45,15 +45,6 @@
           action: "shell sed 's|kube-service-catalog|openshift-operators|g' {{ playbook_dir }}/files/svcat-aggregated-roles.yaml | kubectl {{ action }} -f -"
       tags: svcat
 
-    # TODO: Remove this when move to install from marketplace
-    - name: osb-operators catalog source state={{ state }}
-      vars:
-        name: osb-operators
-        image: "{{ osb_operators_image }}"
-      k8s:
-        state: "{{ state }}"
-        definition: "{{ lookup('template', 'catalogsource.yaml.j2') | from_yaml }}"
-
     # TODO: Replace this with an install from marketplace
     - name: ansible-service-broker state={{ state }}
       vars:
@@ -70,6 +61,7 @@
       loop:
         - namespace.yaml.j2
         - operatorgroup.yaml.j2
+        - catalogsourceconfig.yaml.j2
         - subscription.yaml.j2
       loop_control:
         pause: 2
@@ -125,6 +117,7 @@
       loop:
         - namespace.yaml.j2
         - operatorgroup.yaml.j2
+        - catalogsourceconfig.yaml.j2
         - subscription.yaml.j2
       loop_control:
         pause: 2
